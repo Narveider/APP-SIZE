@@ -7,9 +7,15 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "infoPlist": {
+        "NSCameraUsageDescription": "Esta app usa la camara para capturar una foto y estimar longitudes por comparacion con una referencia."
+      },
       "supportsTablet": true
     },
     "android": {
+      "permissions": [
+        "CAMERA"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -20,6 +26,9 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-status-bar"
+    ]
   }
 }
