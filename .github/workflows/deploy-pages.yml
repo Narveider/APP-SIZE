@@ -34,6 +34,14 @@ jobs:
       - name: Export Expo web
         run: npx expo export --platform web
 
+      - name: Prepare files for GitHub Pages subpath
+        run: |
+          # Ensure Pages serves folders like _expo
+          touch dist/.nojekyll
+          # Expo export writes absolute paths (/...), convert to relative for /APP-SIZE/
+          sed -i 's|href="/|href="./|g' dist/index.html
+          sed -i 's|src="/|src="./|g' dist/index.html
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
