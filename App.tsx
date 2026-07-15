@@ -30,7 +30,7 @@ import { detectLegPointsFromImage } from './src/ai/poseDetector';
 
 const DEFAULT_REFERENCE_CM = '8.56';
 const HISTORY_STORAGE_KEY = 'appsize_measurements_v1';
-const AI_MIN_CONFIDENCE = 0.45;
+const AI_MIN_CONFIDENCE = 0.2;
 const REFERENCE_PRESETS = {
   a4: {
     label: 'Hoja A4 (ancho 21.0 cm)',
@@ -112,7 +112,7 @@ export default function App() {
     };
   }, [canMeasure, perspectiveEnabled, photo, points, referenceCm]);
 
-  const aiQualityBlocked = Boolean(
+  const aiLowConfidence = Boolean(
     aiDetectionMeta && aiDetectionMeta.confidence < AI_MIN_CONFIDENCE,
   );
 
@@ -247,7 +247,7 @@ export default function App() {
       return;
     }
 
-    if (points.length >= 4) {
+    if (points.length >= 2) {
       return;
     }
 
@@ -452,8 +452,8 @@ export default function App() {
             ) : (
               <View style={styles.card}>
                 <Text style={styles.label}>Toca 4 puntos sobre la imagen</Text>
-                <Text style={styles.caption}>Puntos 1-2: referencia | Puntos 3-4: objeto o rodilla-tobillo</Text>
-                <Text style={styles.captionStrong}>Puntos marcados: {points.length}/4</Text>
+                <Text style={styles.caption}>Marca solo 2 puntos de referencia. La IA completa rodilla/tobillo.</Text>
+                <Text style={styles.captionStrong}>Puntos de referencia: {Math.min(points.length, 2)}/2</Text>
 
                 <View
                   style={styles.imageBox}
@@ -524,7 +524,7 @@ export default function App() {
                   onPress={handleDetectLegWithAI}
                 >
                   <Text style={styles.primaryButtonText}>
-                    {isDetectingLeg ? 'Detectando...' : 'Detectar rodilla/tobillo con IA'}
+                    {isDetectingLeg ? 'Detectando...' : 'Detectar una pierna con IA'}
                   </Text>
                 </Pressable>
 
@@ -534,10 +534,10 @@ export default function App() {
 
                 {lastAIDetectionInfo && <Text style={styles.caption}>{lastAIDetectionInfo}</Text>}
 
-                {aiQualityBlocked && (
+                {aiLowConfidence && (
                   <Text style={styles.errorText}>
-                    Deteccion IA bloqueada por baja confianza ({(aiDetectionMeta!.confidence * 100).toFixed(1)}%).
-                    Repite la foto o usa modo manual.
+                    Deteccion IA con confianza baja ({(aiDetectionMeta!.confidence * 100).toFixed(1)}%).
+                    Puedes usarla, pero intenta mejorar iluminacion para mayor precision.
                   </Text>
                 )}
 
@@ -567,8 +567,8 @@ export default function App() {
                 </View>
 
                 <Pressable
-                  style={[styles.primaryButton, (!measurement || aiQualityBlocked) && styles.disabledButton]}
-                  disabled={!measurement || aiQualityBlocked}
+                  style={[styles.primaryButton, !measurement && styles.disabledButton]}
+                  disabled={!measurement}
                   onPress={handleSaveMeasurement}
                 >
                   <Text style={styles.primaryButtonText}>Guardar medicion</Text>
