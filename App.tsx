@@ -44,6 +44,7 @@ const REFERENCE_PRESETS = {
 
 type ReferencePreset = keyof typeof REFERENCE_PRESETS;
 type MainTab = 'medicion' | 'historial';
+type MeasurementMode = 'ia' | 'manual';
 
 type CapturedPhoto = {
   uri: string;
@@ -59,7 +60,9 @@ export default function App() {
   const [selectedReferencePreset, setSelectedReferencePreset] = useState<ReferencePreset | null>(null);
   const [photo, setPhoto] = useState<CapturedPhoto | null>(null);
   const [imageBoxWidth, setImageBoxWidth] = useState(0);
-  const [points, setPoints] = useState<Point[]>([]);
+  const [referencePoints, setReferencePoints] = useState<Point[]>([]);
+  const [manualTargetPoints, setManualTargetPoints] = useState<Point[]>([]);
+  const [aiTargetPoints, setAITargetPoints] = useState<{ knee: Point; ankle: Point } | null>(null);
   const [perspectiveEnabled, setPerspectiveEnabled] = useState(true);
   const [history, setHistory] = useState<SavedMeasurement[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
@@ -68,9 +71,17 @@ export default function App() {
   const [aiDetectionMeta, setAIDetectionMeta] = useState<{ confidence: number; side: 'left' | 'right' } | null>(
     null,
   );
+  const [aiAutoAttempted, setAIAutoAttempted] = useState(false);
   const [activeTab, setActiveTab] = useState<MainTab>('medicion');
+  const [measurementMode, setMeasurementMode] = useState<MeasurementMode>('ia');
 
-  const canMeasure = points.length === 4;
+  const hasReference = referencePoints.length === 2;
+  const selectedTargetPoints = measurementMode === 'manual'
+    ? manualTargetPoints
+    : aiTargetPoints
+      ? [aiTargetPoints.knee, aiTargetPoints.ankle]
+      : [];
+  const canMeasure = hasReference && selectedTargetPoints.length === 2;
   const referenceCm = selectedReferencePreset
     ? REFERENCE_PRESETS[selectedReferencePreset].cm
     : parseReferenceCm(referenceCmInput);
@@ -81,8 +92,8 @@ export default function App() {
       return null;
     }
 
-    const referencePixelDistance = distance(points[0], points[1]);
-    const targetPixelDistance = distance(points[2], points[3]);
+    const referencePixelDistance = distance(referencePoints[0], referencePoints[1]);
+    const targetPixelDistance = distance(selectedTargetPoints[0], selectedTargetPoints[1]);
     const measuredCm = calculateMeasuredLengthCm({
       referenceCm,
       referencePixelDistance,
@@ -93,8 +104,8 @@ export default function App() {
       return null;
     }
 
-    const referenceMidY = midpointY(points[0], points[1]);
-    const targetMidY = midpointY(points[2], points[3]);
+    const referenceMidY = midpointY(referencePoints[0], referencePoints[1]);
+    const targetMidY = midpointY(selectedTargetPoints[0], selectedTargetPoints[1]);
     const perspectiveFactor = photo
       ? applyBasicPerspectiveCorrection({
           referenceMidY,
@@ -110,7 +121,7 @@ export default function App() {
       referencePixelDistance,
       targetPixelDistance,
     };
-  }, [canMeasure, perspectiveEnabled, photo, points, referenceCm]);
+  }, [canMeasure, perspectiveEnabled, photo, referenceCm, referencePoints, selectedTargetPoints]);
 
   const aiLowConfidence = Boolean(
     aiDetectionMeta && aiDetectionMeta.confidence < AI_MIN_CONFIDENCE,
@@ -137,6 +148,22 @@ export default function App() {
 
     loadHistory();
   }, []);
+
+  useEffect(() => {
+    if (
+      measurementMode !== 'ia' ||
+      !photo ||
+      referencePoints.length !== 2 ||
+      isDetectingLeg ||
+      aiTargetPoints ||
+      aiAutoAttempted
+    ) {
+      return;
+    }
+
+    setAIAutoAttempted(true);
+    handleDetectLegWithAI();
+  }, [aiAutoAttempted, aiTargetPoints, isDetectingLeg, measurementMode, photo, referencePoints.length]);
 
   const persistHistory = async (nextHistory: SavedMeasurement[]) => {
     setHistory(nextHistory);
@@ -232,9 +259,12 @@ export default function App() {
         width: result.width,
         height: result.height,
       });
-      setPoints([]);
+      setReferencePoints([]);
+      setManualTargetPoints([]);
+      setAITargetPoints(null);
       setAIDetectionMeta(null);
       setLastAIDetectionInfo(null);
+      setAIAutoAttempted(false);
     } catch {
       Alert.alert('Error de cámara', 'Hubo un problema al tomar la foto.');
     } finally {
@@ -247,24 +277,40 @@ export default function App() {
       return;
     }
 
-    if (points.length >= 2) {
-      return;
-    }
-
     const scale = photo.width / imageBoxWidth;
     const pixelPoint = {
       x: x * scale,
       y: y * scale,
     };
-    setAIDetectionMeta(null);
-    setLastAIDetectionInfo(null);
-    setPoints((prev) => [...prev, pixelPoint]);
+
+    if (referencePoints.length < 2) {
+      setAIDetectionMeta(null);
+      setAITargetPoints(null);
+      setManualTargetPoints([]);
+      setLastAIDetectionInfo(null);
+      setAIAutoAttempted(false);
+      setReferencePoints((prev) => [...prev, pixelPoint]);
+      return;
+    }
+
+    if (measurementMode === 'manual' && manualTargetPoints.length < 2) {
+      setManualTargetPoints((prev) => [...prev, pixelPoint]);
+    }
   };
 
   const handleUndoPoint = () => {
-    setPoints((prev) => prev.slice(0, Math.max(0, prev.length - 1)));
-    setAIDetectionMeta(null);
-    setLastAIDetectionInfo(null);
+    if (measurementMode === 'manual' && manualTargetPoints.length > 0) {
+      setManualTargetPoints((prev) => prev.slice(0, Math.max(0, prev.length - 1)));
+      return;
+    }
+
+    if (referencePoints.length > 0) {
+      setReferencePoints((prev) => prev.slice(0, Math.max(0, prev.length - 1)));
+      setAIDetectionMeta(null);
+      setAITargetPoints(null);
+      setLastAIDetectionInfo(null);
+      setAIAutoAttempted(false);
+    }
   };
 
   const handleDetectLegWithAI = async () => {
@@ -273,7 +319,7 @@ export default function App() {
       return;
     }
 
-    if (points.length < 2) {
+    if (referencePoints.length < 2) {
       Alert.alert(
         'Falta referencia',
         'Primero marca los puntos 1 y 2 de la referencia para poder convertir la estimacion a cm.',
@@ -294,7 +340,10 @@ export default function App() {
         return;
       }
 
-      setPoints((prev) => [prev[0], prev[1], estimate.knee, estimate.ankle]);
+      setAITargetPoints({
+        knee: estimate.knee,
+        ankle: estimate.ankle,
+      });
       setAIDetectionMeta({ confidence: estimate.confidence, side: estimate.side });
       setLastAIDetectionInfo(
         `Pierna: ${estimate.side} | Confianza aprox.: ${(estimate.confidence * 100).toFixed(1)}%`,
@@ -350,6 +399,51 @@ export default function App() {
 
         {activeTab === 'medicion' ? (
           <>
+            <View style={styles.card}>
+              <Text style={styles.label}>Modo de medicion</Text>
+              <View style={styles.rowButtons}>
+                <Pressable
+                  style={[styles.secondaryButton, measurementMode === 'ia' && styles.selectedReferenceButton]}
+                  onPress={() => {
+                    setMeasurementMode('ia');
+                    setManualTargetPoints([]);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.secondaryButtonText,
+                      measurementMode === 'ia' && styles.selectedReferenceButtonText,
+                    ]}
+                  >
+                    IA (2 puntos)
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.secondaryButton, measurementMode === 'manual' && styles.selectedReferenceButton]}
+                  onPress={() => {
+                    setMeasurementMode('manual');
+                    setAIDetectionMeta(null);
+                    setAITargetPoints(null);
+                    setLastAIDetectionInfo(null);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.secondaryButtonText,
+                      measurementMode === 'manual' && styles.selectedReferenceButtonText,
+                    ]}
+                  >
+                    Manual (2+2)
+                  </Text>
+                </Pressable>
+              </View>
+              <Text style={styles.caption}>
+                {measurementMode === 'ia'
+                  ? 'Marca 2 puntos de referencia y la IA estimara rodilla/tobillo.'
+                  : 'Marca 2 puntos de referencia y luego 2 puntos manuales de la altura.'}
+              </Text>
+            </View>
+
             <View style={styles.card}>
               <Text style={styles.label}>Referencia conocida (cm)</Text>
               <View style={styles.rowButtons}>
@@ -451,9 +545,18 @@ export default function App() {
               </View>
             ) : (
               <View style={styles.card}>
-                <Text style={styles.label}>Toca 4 puntos sobre la imagen</Text>
-                <Text style={styles.caption}>Marca solo 2 puntos de referencia. La IA completa rodilla/tobillo.</Text>
-                <Text style={styles.captionStrong}>Puntos de referencia: {Math.min(points.length, 2)}/2</Text>
+                <Text style={styles.label}>Toca 2 puntos sobre la imagen</Text>
+                <Text style={styles.caption}>
+                  {referencePoints.length < 2
+                    ? 'Paso 1: marca 2 puntos de referencia.'
+                    : measurementMode === 'manual'
+                      ? 'Paso 2: marca 2 puntos de altura manual.'
+                      : 'Paso 2: ejecuta IA para detectar la pierna.'}
+                </Text>
+                <Text style={styles.captionStrong}>
+                  Referencia: {Math.min(referencePoints.length, 2)}/2
+                  {measurementMode === 'manual' ? ` | Altura: ${manualTargetPoints.length}/2` : ''}
+                </Text>
 
                 <View
                   style={styles.imageBox}
@@ -470,7 +573,7 @@ export default function App() {
                         handleAddPoint(event.nativeEvent.locationX, event.nativeEvent.locationY);
                       }}
                     >
-                      {points.map((point, index) => {
+                      {[...referencePoints, ...selectedTargetPoints].map((point, index) => {
                         const displayScale = imageBoxWidth / photo.width;
                         const left = point.x * displayScale - 8;
                         const top = point.y * displayScale - 8;
@@ -488,17 +591,23 @@ export default function App() {
                   <Pressable
                     style={styles.secondaryButton}
                     onPress={() => {
-                      setPoints([]);
+                      setReferencePoints([]);
+                      setManualTargetPoints([]);
+                      setAITargetPoints(null);
                       setAIDetectionMeta(null);
                       setLastAIDetectionInfo(null);
+                      setAIAutoAttempted(false);
                     }}
                   >
                     <Text style={styles.secondaryButtonText}>Reiniciar puntos</Text>
                   </Pressable>
                   <Pressable
-                    style={[styles.secondaryButton, points.length === 0 && styles.disabledButton]}
+                    style={[
+                      styles.secondaryButton,
+                      referencePoints.length === 0 && manualTargetPoints.length === 0 && styles.disabledButton,
+                    ]}
                     onPress={handleUndoPoint}
-                    disabled={points.length === 0}
+                    disabled={referencePoints.length === 0 && manualTargetPoints.length === 0}
                   >
                     <Text style={styles.secondaryButtonText}>Deshacer punto</Text>
                   </Pressable>
@@ -506,30 +615,47 @@ export default function App() {
                     style={styles.secondaryButton}
                     onPress={() => {
                       setPhoto(null);
-                      setPoints([]);
+                      setReferencePoints([]);
+                      setManualTargetPoints([]);
+                      setAITargetPoints(null);
                       setAIDetectionMeta(null);
                       setLastAIDetectionInfo(null);
+                      setAIAutoAttempted(false);
                     }}
                   >
                     <Text style={styles.secondaryButtonText}>Nueva foto</Text>
                   </Pressable>
                 </View>
 
-                <Pressable
-                  style={[
-                    styles.primaryButton,
-                    (isDetectingLeg || points.length < 2) && styles.disabledButton,
-                  ]}
-                  disabled={isDetectingLeg || points.length < 2}
-                  onPress={handleDetectLegWithAI}
-                >
-                  <Text style={styles.primaryButtonText}>
-                    {isDetectingLeg ? 'Detectando...' : 'Detectar una pierna con IA'}
-                  </Text>
-                </Pressable>
+                {measurementMode === 'ia' && (
+                  <Pressable
+                    style={[
+                      styles.primaryButton,
+                      (isDetectingLeg || referencePoints.length < 2) && styles.disabledButton,
+                    ]}
+                    disabled={isDetectingLeg || referencePoints.length < 2}
+                    onPress={handleDetectLegWithAI}
+                  >
+                    <Text style={styles.primaryButtonText}>
+                      {isDetectingLeg
+                        ? 'Detectando...'
+                        : aiDetectionMeta
+                          ? 'Recalcular IA'
+                          : 'Detectar una pierna con IA'}
+                    </Text>
+                  </Pressable>
+                )}
 
-                {points.length < 2 && (
+                {referencePoints.length < 2 && (
                   <Text style={styles.caption}>Marca primero los puntos 1 y 2 de la referencia.</Text>
+                )}
+                {measurementMode === 'ia' && referencePoints.length === 2 && !aiDetectionMeta && !isDetectingLeg && (
+                  <Text style={styles.caption}>
+                    Aun no hay deteccion IA. Presiona el boton de IA para estimar rodilla/tobillo.
+                  </Text>
+                )}
+                {measurementMode === 'manual' && referencePoints.length === 2 && manualTargetPoints.length < 2 && (
+                  <Text style={styles.caption}>Marca ahora 2 puntos manuales para la altura estimada.</Text>
                 )}
 
                 {lastAIDetectionInfo && <Text style={styles.caption}>{lastAIDetectionInfo}</Text>}
@@ -550,7 +676,7 @@ export default function App() {
                   <Text style={styles.resultText}>
                     {measurement
                       ? `${formatCm(measurement.correctedCm)} cm`
-                      : 'Marca los 4 puntos para obtener la medición.'}
+                      : 'Marca 2 puntos de referencia y ejecuta la IA para obtener la medicion.'}
                   </Text>
                   {measurement && (
                     <>
