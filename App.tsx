@@ -261,6 +261,12 @@ export default function App() {
     setPoints((prev) => [...prev, pixelPoint]);
   };
 
+  const handleUndoPoint = () => {
+    setPoints((prev) => prev.slice(0, Math.max(0, prev.length - 1)));
+    setAIDetectionMeta(null);
+    setLastAIDetectionInfo(null);
+  };
+
   const handleDetectLegWithAI = async () => {
     if (!photo) {
       Alert.alert('Toma una foto', 'Primero debes capturar una imagen.');
@@ -313,7 +319,11 @@ export default function App() {
   return (
     <SafeAreaView style={styles.screen}>
       <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.content} style={styles.mainScroll}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        style={styles.mainScroll}
+        scrollEnabled={!(activeTab === 'medicion' && Boolean(photo))}
+      >
         <Text style={styles.title}>Medición por cámara</Text>
         <Text style={styles.helperText}>
           1) Coloca un objeto de referencia visible en la foto. 2) Marca dos puntos de la referencia.
@@ -443,6 +453,7 @@ export default function App() {
               <View style={styles.card}>
                 <Text style={styles.label}>Toca 4 puntos sobre la imagen</Text>
                 <Text style={styles.caption}>Puntos 1-2: referencia | Puntos 3-4: objeto o rodilla-tobillo</Text>
+                <Text style={styles.captionStrong}>Puntos marcados: {points.length}/4</Text>
 
                 <View
                   style={styles.imageBox}
@@ -485,6 +496,13 @@ export default function App() {
                     <Text style={styles.secondaryButtonText}>Reiniciar puntos</Text>
                   </Pressable>
                   <Pressable
+                    style={[styles.secondaryButton, points.length === 0 && styles.disabledButton]}
+                    onPress={handleUndoPoint}
+                    disabled={points.length === 0}
+                  >
+                    <Text style={styles.secondaryButtonText}>Deshacer punto</Text>
+                  </Pressable>
+                  <Pressable
                     style={styles.secondaryButton}
                     onPress={() => {
                       setPhoto(null);
@@ -498,14 +516,21 @@ export default function App() {
                 </View>
 
                 <Pressable
-                  style={[styles.primaryButton, isDetectingLeg && styles.disabledButton]}
-                  disabled={isDetectingLeg}
+                  style={[
+                    styles.primaryButton,
+                    (isDetectingLeg || points.length < 2) && styles.disabledButton,
+                  ]}
+                  disabled={isDetectingLeg || points.length < 2}
                   onPress={handleDetectLegWithAI}
                 >
                   <Text style={styles.primaryButtonText}>
                     {isDetectingLeg ? 'Detectando...' : 'Detectar rodilla/tobillo con IA'}
                   </Text>
                 </Pressable>
+
+                {points.length < 2 && (
+                  <Text style={styles.caption}>Marca primero los puntos 1 y 2 de la referencia.</Text>
+                )}
 
                 {lastAIDetectionInfo && <Text style={styles.caption}>{lastAIDetectionInfo}</Text>}
 
@@ -663,6 +688,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#4a6d89',
   },
+  captionStrong: {
+    fontSize: 12,
+    color: '#1f5f96',
+    fontWeight: '700',
+  },
   toggleButton: {
     backgroundColor: '#eaf4fb',
     borderRadius: 8,
@@ -732,16 +762,18 @@ const styles = StyleSheet.create({
   },
   point: {
     position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: '#e64f4f',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
   },
   pointText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
   },
   rowButtons: {

@@ -80,9 +80,16 @@ export const detectLegPointsFromImage = async (uri: string): Promise<PoseLegEsti
   const detector = await getDetector();
   const image = await loadImage(uri);
   const imageTensor = tf.browser.fromPixels(image);
+  const maxSide = 512;
+  const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+  const resizedTensor =
+    scale < 1
+      ? tf.image.resizeBilinear(imageTensor, [Math.round(image.height * scale), Math.round(image.width * scale)])
+      : imageTensor;
+  const inferTensor = scale < 1 ? tf.cast(resizedTensor, 'int32') : imageTensor;
 
   try {
-    const poses = await detector.estimatePoses(imageTensor as unknown as poseDetection.PoseDetectorInput, {
+    const poses = await detector.estimatePoses(inferTensor as unknown as poseDetection.PoseDetectorInput, {
       maxPoses: 1,
       flipHorizontal: false,
     });
@@ -110,17 +117,21 @@ export const detectLegPointsFromImage = async (uri: string): Promise<PoseLegEsti
 
     return {
       knee: {
-        x: selectedKnee.x,
-        y: selectedKnee.y,
+        x: selectedKnee.x / scale,
+        y: selectedKnee.y / scale,
       },
       ankle: {
-        x: selectedAnkle.x,
-        y: selectedAnkle.y,
+        x: selectedAnkle.x / scale,
+        y: selectedAnkle.y / scale,
       },
       confidence: selectedSide === 'left' ? leftScore : rightScore,
       side: selectedSide,
     };
   } finally {
+    if (scale < 1) {
+      resizedTensor.dispose();
+      inferTensor.dispose();
+    }
     imageTensor.dispose();
   }
 };
