@@ -149,21 +149,23 @@ export default function App() {
     loadHistory();
   }, []);
 
-  useEffect(() => {
-    if (
-      measurementMode !== 'ia' ||
-      !photo ||
-      referencePoints.length !== 2 ||
-      isDetectingLeg ||
-      aiTargetPoints ||
-      aiAutoAttempted
-    ) {
-      return;
-    }
-
-    setAIAutoAttempted(true);
-    handleDetectLegWithAI();
-  }, [aiAutoAttempted, aiTargetPoints, isDetectingLeg, measurementMode, photo, referencePoints.length]);
+  // Disabled automatic AI detection to prevent UI freezing on point marking
+  // Users must manually trigger detection by pressing the button
+  // useEffect(() => {
+  //   if (
+  //     measurementMode !== 'ia' ||
+  //     !photo ||
+  //     referencePoints.length !== 2 ||
+  //     isDetectingLeg ||
+  //     aiTargetPoints ||
+  //     aiAutoAttempted
+  //   ) {
+  //     return;
+  //   }
+  //
+  //   setAIAutoAttempted(true);
+  //   handleDetectLegWithAI();
+  // }, [aiAutoAttempted, aiTargetPoints, isDetectingLeg, measurementMode, photo, referencePoints.length]);
 
   const persistHistory = async (nextHistory: SavedMeasurement[]) => {
     setHistory(nextHistory);
