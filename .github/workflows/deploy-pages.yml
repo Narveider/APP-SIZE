@@ -23,11 +23,11 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Ensure Expo web dependencies
         run: |
-          npm install --no-save react-dom@19.2.3 react-native-web@^0.21.2
+          npm install --no-save --legacy-peer-deps react-dom@19.2.3 react-native-web@^0.21.2
           npm ls react-dom react-native-web
 
       - name: Export Expo web
