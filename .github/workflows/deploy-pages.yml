@@ -35,11 +35,8 @@ jobs:
 
       - name: Prepare files for GitHub Pages subpath
         run: |
-          # Ensure Pages serves folders like _expo
           touch dist/.nojekyll
-          # SPA fallback for deep links
           cp dist/index.html dist/404.html
-          # Expo export writes absolute paths (/...), convert to relative for /APP-SIZE/
           sed -i 's|href="/|href="./|g' dist/index.html
           sed -i 's|src="/|src="./|g' dist/index.html
           sed -i 's|href="/|href="./|g' dist/404.html

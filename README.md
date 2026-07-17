@@ -42,6 +42,16 @@ Alternativa tambien gratuita:
 
 En este proyecto se implemento MoveNet para deteccion automatica de rodilla/tobillo desde foto.
 
+## Entrenamiento con dataset
+
+Se agrego un pipeline de entrenamiento en `training/` para reducir fallos con datos reales:
+
+- Conversion de COCO a formato pose de 4 keypoints (rodilla/tobillo).
+- Entrenamiento por transferencia con YOLO Pose.
+- Guia paso a paso en `training/README.md`.
+
+Recomendacion: combinar COCO con fotos reales del escenario clinico para mejorar robustez en pacientes postrados.
+
 ### Flujo para pacientes postrados
 
 1. Captura una foto lateral donde se vea bien la pierna.

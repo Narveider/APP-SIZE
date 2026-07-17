@@ -171,7 +171,26 @@ export default function App() {
   };
 
   const handleSaveMeasurement = async () => {
-    if (!measurement || !referenceCm) {
+    if (!referenceCm) {
+      Alert.alert('Falta referencia', 'Debes ingresar o seleccionar una referencia valida en cm.');
+      return;
+    }
+
+    if (!measurement) {
+      if (referencePoints.length < 2) {
+        Alert.alert('Faltan puntos', 'Marca primero 2 puntos de referencia.');
+        return;
+      }
+
+      if (measurementMode === 'ia') {
+        Alert.alert(
+          'Falta deteccion IA',
+          'Aun no hay deteccion de pierna. Presiona "Detectar una pierna con IA" o cambia a modo manual.',
+        );
+        return;
+      }
+
+      Alert.alert('Faltan puntos manuales', 'Marca 2 puntos manuales de altura para poder guardar.');
       return;
     }
 
@@ -335,7 +354,7 @@ export default function App() {
       if (!estimate) {
         Alert.alert(
           'IA sin deteccion',
-          'No se detecto rodilla/tobillo con suficiente calidad. Usa el modo manual para completar puntos 3 y 4.',
+          'No se detecto rodilla/tobillo con suficiente calidad. Cambia a modo manual para marcar 2 puntos de altura.',
         );
         return;
       }
@@ -693,8 +712,7 @@ export default function App() {
                 </View>
 
                 <Pressable
-                  style={[styles.primaryButton, !measurement && styles.disabledButton]}
-                  disabled={!measurement}
+                  style={styles.primaryButton}
                   onPress={handleSaveMeasurement}
                 >
                   <Text style={styles.primaryButtonText}>Guardar medicion</Text>
