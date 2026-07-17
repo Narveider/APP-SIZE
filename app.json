@@ -1,11 +1,13 @@
 {
   "expo": {
     "name": "APP-Size",
-    "slug": "APP-Size",
+    "slug": "APP-SIZE",
     "version": "1.0.0",
+    "scheme": "app-size",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "platforms": ["ios", "android", "web"],
     "ios": {
       "infoPlist": {
         "NSCameraUsageDescription": "Esta app usa la camara para capturar una foto y estimar longitudes por comparacion con una referencia."
@@ -25,7 +27,8 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "basePath": "/APP-SIZE/"
     },
     "plugins": [
       "expo-status-bar"
